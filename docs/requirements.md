@@ -52,6 +52,7 @@ freigabereif. `[V]` = Wert ist ein Vorschlag, kein bestätigter Zielwert.
 | **FR-02** | Vor dem Stichtag ist der Login-Einstieg jederzeit **ohne Datenverlust und ohne Codeänderung** auf den Verimi-Weg zurückstellbar (Fallback). | Phase 1 | C-1.1, CN-1 |
 | **FR-03** | Alle Login-Einstiege („Anmelden", „Passkey Login") leiten ausschließlich auf die dokumentierten Ziele weiter (Phasenziel bzw. Passkey-Authentifizierung). Es existiert kein weiterer, undokumentierter Login-Weg für Endnutzer. *(Änderung 2026-10-08: „Passkey Login" ist dokumentiert, siehe FR-01.)* | beide | C-2.5 |
 | **FR-04** | Der Adesso-Login bleibt unverändert bestehen und wird von dieser Lösung weder angefasst noch in den Phasenwechsel einbezogen. `[OQ-10]` | beide | Out of Scope |
+| **FR-05** | Auf der **Portal-Loginseite** wird ein zusätzlicher Eintrag **„Passkey verloren“** bereitgestellt. Dieser führt zu einem selbstbedienbaren Recovery-Dialog. Eine Änderung der Keycloak-Login-UI ist **nicht** gefordert. | beide | G-7, C-P.6 |
 
 ### 1.2 Migrationsphase — Registrierung
 
@@ -76,7 +77,7 @@ freigabereif. `[V]` = Wert ist ein Vorschlag, kein bestätigter Zielwert.
 | **FR-31** | Nach erfolgreicher Authentifizierung erhält der User Zugriff auf den geschützten Portalbereich. | C-2.2, G-3 |
 | **FR-32** | Der geschützte Bereich ist **ausschließlich** mit einem gültigen, nicht abgelaufenen Token des neuen Identitätsanbieters betretbar. Ein veralteter, selbst erzeugter oder vom Client manipulierter Berechtigungsnachweis wird abgewiesen. | C-2.2, G-1 |
 | **FR-33** | Es ist genau **ein** Credential für Endnutzer vorgesehen. Ein alternatives Credential wird technisch nicht angeboten. | C-2.5, BR-03 |
-| **FR-34** | Es existiert **kein** selbstständiger, technisch umsetzbarer Weg zur Wiederherstellung eines Passkeys durch den User selbst (kein E-Mail-Link, kein Einmalcode, kein Support-Backdoor). | C-2.5, BR-04 |
+| **FR-34** | Im Rahmen des **selbstbedienbaren Recovery-Wegs** (FR-100 ff.) kann ein User nach erfolgreicher Validierung von PENR + Einmalcode einen neuen Passkey registrieren. Ein E-Mail-Link, SMS-Code oder sonstiger nicht definierter Wiederherstellungsweg wird nicht eingesetzt. Der bestehende Vermerk gilt für Fälle **ohne** gültigen Einmalcode. | C-2.5, BR-04, G-7 |
 | **FR-35** | Fehlgeschlagene Passkey-Authentifizierungen erzeugen eine für Endnutzer verständliche Meldung und einen technisch auswertbaren Log-Eintrag. Die Meldung enthält **keine** Information darüber, ob das Identitätssubjekt existiert. | C-2.1, NFR-Sec-06 |
 
 ### 1.4 Sperr- und Übergangslogik
@@ -119,11 +120,24 @@ freigabereif. `[V]` = Wert ist ein Vorschlag, kein bestätigter Zielwert.
 |---|---|---|
 | **FR-70** | Vor dem Stichtag wird für **alle** registrierten Passkeys ein Stichprobentest durchgeführt, ob eine Anmeldung mit diesem Passkey tatsächlich möglich ist. | C-3.5, R-06, R-12 |
 | **FR-71** | Das Verfahren ist so gestaltet, dass es **ohne** Mitwirkung des Endnutzers auskommt und ohne Kenntnis des Passkey-Geheimnisses auskommt. `[V: Prüfung über serverseitig registrierte Credential-IDs und Erreichbarkeit der Authentifizierung; das konkrete Verfahren ist bei der Ausarbeitung zu bestätigen]` | C-3.5 |
-| **FR-72** | Endnutzer, deren Passkey-Anmeldung nicht nachweisbar funktioniert, werden **aktiv** zurückgerufen und auf eine rechtzeitige Migration oder den manuellen Weg verwiesen. | C-3.5, OQ-16 |
+| **FR-72** | Endnutzer, deren Passkey-Anmeldung nicht nachweisbar funktioniert, werden **aktiv** zurückgerufen und auf eine rechtzeitige Migration oder den manuellen Weg verwiesen. Der selbstbedienbare Recovery-Weg (FR-100 ff.) stellt hierfür keine generelle Ersetzung des Erreichbarkeitstests dar. | C-3.5, OQ-16, G-7 |
 | **FR-73** | Ergebnis und Quote des Erreichbarkeitstests werden dokumentiert und berichtet. `[V: Vollständigkeitsnachweis über alle registrierten Passkeys, nicht nur über eine Stichprobe]` | SC-9 |
 | **FR-74** | Der Erreichbarkeitstest endet rechtzeitig **vor** dem Stichtag, mit einer Vorlaufzeit, die eine erneute Migration für die zurückgerufenen Endnutzer noch zulässt. `[V: Abschluss bis 2026-11-30]` | R-06, OQ-16 |
 
-### 1.8 Migrationsquoten-Reporting — `kann`, out-of-scope bis 2026-10-31
+### 1.8 Passkey-Recovery (selbstbedient)
+
+| Nr. | Anforderung | Trace |
+|---|---|---|
+| **FR-100** | Der Dialog **„Passkey verloren“** auf der Portal-Loginseite erfasst **PENR** und den **8-12-stelligen Einmalcode**. Nur diese beiden Werte sind für den Start der Recovery erforderlich. | G-7, C-P.6 |
+| **FR-101** | Der **PENR** ist einem bestimmten Portal/Realm zugeordnet. Die Validierung ist **realmgebunden**. Eine PENR ist nur im zugehörigen Realm gültig; Cross-Realm-Recovery ist nicht zulässig. Die Keycloak-Instanz ist entsprechend anzupassen. | G-7, CO-09-ähnlich / Realm-Scoping-Hardconstraint |
+| **FR-102** | Der **Einmalcode** wird **ausschließlich zum Zeitpunkt der Passkey-Registrierung** ausgestellt. Codes für User, die bereits vor dieser Funktion einen Passkey registriert haben, werden nicht nachgestellt (Backfill) — out of scope. | G-7 |
+| **FR-103** | Nach erfolgreicher Prüfung von PENR + Einmalcode kann der User **genau wie bei der erstmaligen Passkey-Registrierung** einen neuen Passkey in Keycloak registrieren. Nach erfolgreicher Registrierung ist eine erneute Anmeldung mit dem neuen Passkey möglich. | G-7, FR-17 |
+| **FR-104** | Das PENR kann nach Annahme als bekannt vorausgesetzt werden (auf E-Mails vorhanden, vergleichbar einer Versicherungsnummer). Ein Verlust des PENR ist out of scope. Verlust **beider** Werte (PENR + Einmalcode) ist out of scope. | G-7 |
+| **FR-105** | Die Wiederherstellung ist **nur selbstbedient**. Support-initiierte Recovery ist nicht gefordert. Der Abruf des PENR erfolgt über eine vorhandene REST-API (Implementierung out of scope) — die Lösung darf davon ausgehen, dass diese verfügbar ist. | G-7 |
+| **FR-106** | Für den Prototyp sind **3 der 9 Portale/Reiche** ausreichend. Realm-Scoping ist für alle abgedeckten Reiche hart durchzusetzen. | G-7, C-P.6 |
+| **FR-107** | Recovery-Vorgänge sind protokolliert (Zeitpunkt, Realm/Portal, Ergebnis), enthalten aber **keine** Passkey-Geheimnisse und geben **keine** Auskunft darüber, ob ein PENR/Einmalcode existiert oder ungültig ist (gleiches Prinzip wie FR-35/NFR-Sec-04). | G-7, NFR-Sec-04, NFR-Sec-06 |
+
+### 1.9 Migrationsquoten-Reporting — `kann`, out-of-scope bis 2026-10-31
 
 > **Herabstufung 2026-10-06:** Bis zum 2026-10-31 wird dieses Feature nicht
 > umgesetzt und nicht abgenommen. Alle Anforderungen dieser Abteilung sind
@@ -137,7 +151,7 @@ freigabereif. `[V]` = Wert ist ein Vorschlag, kein bestätigter Zielwert.
 | **FR-82** | `kann` | Die Erhebung enthält **keine** Personendaten; sie arbeitet ausschließlich mit aggregierten Zählwerten. | NFR-DS-01 |
 | **FR-83** | `kann` | Unterschreitet die Quote einen festgelegten Mindestwert, wird ein **Eskalationsprozess** ausgelöst. Der Mindestwert und die Schwelle sind festzulegen. `[OQ-11]` | BR-01, OQ-11 |
 
-### 1.9 Betrieb
+### 1.10 Betrieb
 
 | Nr. | Anforderung | Trace |
 |---|---|---|
@@ -236,7 +250,7 @@ freigabereif. `[V]` = Wert ist ein Vorschlag, kein bestätigter Zielwert.
 | **BR-01** | Die Migrationsquote ist **nicht** 100 % erreichbar. Erreichbar sind maximal **80.000 von 120.000 = 67 %**, da ca. 40.000 Endnutzer keinen Nachweis erbringen können und ausgeschlossen sind. Ein Mindestmigrationswert und ein Maßnahmenplan bei Unterschreitung sind festzulegen. **Empfehlung: ≥ 95 % der registrierungsfähigen Grundgesamtheit.** | **`kann` — out-of-scope bis 2026-10-31 `[OQ-11]`** |
 | **BR-02** | Der dauerhafte Ausschluss von ca. 40.000 Endnutzern mit Nicht-EU-Reisepass ist eine **bewusste geschäftliche Entscheidung** des Projektträgers. Ein gesetzlicher Identitätsnachweis ist **nicht** vorgeschrieben; die Ungleichbehandlung ist damit nicht rechtlich gedeckt. | akzeptiert (R-02 offen) |
 | **BR-03** | Passkey ist ab dem Stichtag das **einzige** Credential. Ein Ausweich-Credential wird nicht angeboten. | bestätigt |
-| **BR-04** | Für Endnutzer der Gruppe A existiert **kein** Recovery-Weg. Geräteverlust bedeutet endgültigen Zugangsverlust. | bestätigt (Empfehlung R-04 offen) |
+| **BR-04** | Für Endnutzer der Gruppe A existiert ein **selbstbedienbarer** Recovery-Weg über PENR + Einmalcode (FR-100 ff.). Geräteverlust ohne gültigen Einmalcode bedeutet endgültigen Zugangsverlust. | bestätigt |
 | **BR-05** | Die Migration ist **freiwillig**. Eine Nicht-Teilnahme ist bis zum Stichtag zulässig und hat keine unmittelbaren Nachteile. | bestätigt |
 | **BR-06** | Der Anspruch auf manuelle Nachregistrierung besteht **nur** für Personen mit deutschem oder EU-Reisepass. Der Kriterium ist die Nachweismöglichkeit, nicht die Nationalität. | bestätigt (R-02 offen) |
 | **BR-07** | Die manuelle Nachregistrierung **reaktiviert den bestehenden** Datensatz. Es werden keine neuen Datensätze angelegt. | bestätigt |
@@ -248,6 +262,8 @@ freigabereif. `[V]` = Wert ist ein Vorschlag, kein bestätigter Zielwert.
 | **BR-13** | Hochverfügbarkeit und Redundanz sind **kein** Leistungsbestandteil. Ein gemessener Wiederherstellungsnachweis genügt. | bestätigt |
 | **BR-14** | Der fachliche Endnutzer-Support (falscher Browser, Geräteverlust, gescheiterte Registrierung) ist **niemandem zugewiesen**. Diese Lücke ist eine **offene Abhängigkeit**, nicht eine akzeptierte Entscheidung. `[OQ-18]` | **offen** |
 | **BR-15** | Der manuelle Schalter setzt Personal, Ort und Erreichbarkeit voraus. Ohne diese Festlegung wird der Anspruch aus BR-06/FR-50 **nicht** erfüllbar. `[A-03]` | **offen** |
+| **BR-16** | Bei der erstmaligen Passkey-Registrierung ist der **8-12-stellige Einmalcode** auszustellen und dem User zur sicheren Aufbewahrung mitzuteilen. Nur so ist der selbstbedienbare Recovery-Weg (FR-100 ff.) nutzbar. | bestätigt |
+| **BR-17** | Der PENR ist realmgebunden. Recovery ist nur innerhalb des korrekten Portals/Realm zulässig. Die Keycloak-Instanz muss entsprechend angepasst werden. | bestätigt |
 
 ---
 
@@ -402,7 +418,7 @@ hier ausdrücklich als **Nicht-Anforderung** festgehalten:
 |---|---|
 | **Migrationsquoten-Reporting (FR-80..FR-83, AC-11, AC-12, BR-01, OQ-11)** | Entscheidung 2026-10-06: bis 2026-10-31 out-of-scope, `kann`-Stufe. Kein Wochentreporting, kein Eskalationsprozess. |
 | Hochverfügbarkeit, Redundanz, Failover | BR-13, NFR-AV-03. Ein gemessener Restore-Nachweis genügt. |
-| Recovery-Weg für Gruppe A | BR-04 — Entscheidung des Auftraggebers. *Empfehlung R-04 bleibt offen.* |
+| Recovery-Weg für Gruppe A ohne gültigen Einmalcode / bei Verlust beider Werte | BR-04, FR-104 — bewusst out of scope. |
 | Mobile Passkeys | CO-03 — Entscheidung des Auftraggebers. |
 | Rechtliche Identitätsverifikation | CO-11 — nicht vorgeschrieben. |
 | E-Mail-/SMS-Wiederherstellung, Einmalcodes als Credential | BR-03, BR-04. |

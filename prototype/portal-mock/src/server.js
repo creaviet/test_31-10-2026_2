@@ -11,6 +11,7 @@ import { cfg } from './config.js';
 import { openDb } from './db.js';
 import { publicRoutes } from './routes/public.js';
 import { adminRoutes } from './routes/admin.js';
+import { recoveryRoutes } from './routes/recovery.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -51,6 +52,7 @@ app.use(
 );
 
 publicRoutes(app, db);
+recoveryRoutes(app, db);
 adminRoutes(app, db);
 
 // Fehler-Rückgabewert: verständlich, ohne Stacktrace, ohne Existenzauskunft (SEC-04)

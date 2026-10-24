@@ -72,6 +72,15 @@ input:focus-visible {
 .hint { color: var(--muted); margin-top: 0.75rem; }
 .footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 1.5rem; }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+.link-btn:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }

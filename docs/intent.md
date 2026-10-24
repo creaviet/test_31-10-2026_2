@@ -27,13 +27,19 @@ von bis zu 120.000 Endnutzern mit geringer technischer Affinität, ohne
 kontrollierte Geräteumgebung**, in ein Credential-Modell ohne
 Alternative und ohne Recovery-Weg.
 
+**Ergänzung (Passkey-Recovery):** Geht ein Passkey verloren, ist der User
+derzeit blockiert. Eine Re-Authentifizierung über einen IdP ist für diesen
+Anwendungsfall zunächst out of scope. Es wird ein **selbstbedienbarer**
+Recovery-Weg benötigt, damit ein User einen neuen Passkey registrieren und
+sich wieder anmelden kann.
+
 ---
 
 ## 2. Users
 
 | Gruppe | Beschreibung | Volumen | Leben ab 2027-01-01 |
 |---|---|---|---|
-| **A — Migriert** | Hat bis 2026-12-31 einen Passkey registriert | max. 80.000 | Passkey-Login. **Kein Recovery-Weg.** |
+| **A — Migriert** | Hat bis 2026-12-31 einen Passkey registriert | max. 80.000 | Passkey-Login. **Selbstbedienbarer Recovery-Weg über PENR + Einmalcode verfügbar (siehe Abschnitt 3/4).** |
 | **B — Nicht migriert, DE/EU-Reisepass** | Kein Passkey, Reisepass vorhanden | Teilmenge der ~40.000 | Gesperrt; manuelle Reaktivierung 2027 möglich |
 | **C — Nicht migriert, Nicht-EU-Reisepass** | Kein Passkey, kein ID-Nachweis möglich | Rest der ~40.000 | **Dauerhaft gesperrt. Kein Weg zurück.** |
 | **D — Support / Portal-Betrieb** | Interne Fachsupport für Passkey-Fehler | unbekannt | Fachverantwortung ungeplant (OQ-18), Betrieb bei diesem Projekt (N-08) |
@@ -56,9 +62,10 @@ Nicht betroffen: externe Partner/Lieferanten, Service-Accounts, M2M.
 | G-4 | Der manuelle Weg für Gruppe B existiert am Stichtag einsatzbereit | muss |
 | G-5 | Kein Eingriff in Portal-Datenlogik, Entitlement-Logik oder Stammdaten | muss |
 | G-6 | Betriebsfähigkeit (Installation, Updates, Backup, Monitoring, Restore) ist in diesem Projekt nachgewiesen | muss |
+| G-7 | Endnutzer können einen verlorenen Passkey **selbstbedient** über PENR + Einmalcode wiederherstellen und einen neuen Passkey registrieren, um sich wieder anzumelden | muss |
 
 **Explizit kein Ziel:** rechtliche Identitätsverifikation, Redundanz/HA
-(siehe R-13), mobile Passkeys, Recovery für Gruppe A.
+(siehe R-13), mobile Passkeys, IdP-Re-Authentifizierung (für diesen Fall out of scope), Recovery durch Support, Cross-Realm-Recovery, Recovery bei Verlust von PENR und/oder Einmalcode.
 
 ---
 
@@ -107,6 +114,7 @@ Nicht betroffen: externe Partner/Lieferanten, Service-Accounts, M2M.
 | C-P.3 | Keycloak mit Passkey, on-premise, **nah am Endprodukt** (kein Mock). |
 | C-P.4 | Test-User für Migrations- und Passkey-Login. |
 | C-P.5 | Nachweis: **Verimi-Mock und echtes Verimi sind über denselben Keycloak-Login ersetzbar.** |
+| C-P.6 | **Passkey-Recovery:** Option „Passkey verloren“ auf der Portal-Loginseite; Recovery über PENR + Einmalcode zur erneuten Passkey-Registrierung (realm-gebunden). Nur für 3 der 9 Portale/Reiche im Prototyp. |
 
 ---
 
@@ -120,7 +128,13 @@ Nicht betroffen: externe Partner/Lieferanten, Service-Accounts, M2M.
 | Geräteverwaltung, MDM, kontrollierte Browser/Endgeräte | niemand |
 | Fachlicher Endnutzer-Support (Support-Hotline, Passkey-Hilfe) | **niemand — OQ-18** |
 | Mobile Passkey-Lösung | später |
-| Recovery-Pfad für Gruppe A | bewusst nicht (F-14) |
+| IdP-Re-Authentifizierung für den Recovery-Fall | out of scope (dieser Task) |
+| Support-initiierte Recovery | out of scope |
+| Cross-Realm-Recovery | out of scope |
+| Recovery bei Verlust von PENR und/oder Einmalcode | out of scope |
+| Ausstellen von Einmalcodes für bereits registrierte User (Backfill) | out of scope |
+| Implementierung der REST-API zum Abruf des PENR | out of scope (angenommen verfügbar) |
+| Recovery über Keycloak-Login-UI | out of scope (nur Portal-Loginseite) |
 | Hochverfuegbarkeit / Redundanz | bewusst nicht (R-13) |
 | Rechtliche Identitätsverifikation der User | nicht vorgeschrieben (C-05) |
 
@@ -153,7 +167,7 @@ Einstufung: W = Wahrscheinlichkeit, A = Auswirkung (1–5).
 | ID | Risiko | W/A | Bewertung + Maßnahme |
 |---|---|---|---|
 | **R-01** | **Dauerhafter Zugangsverlust für ca. 40.000 Nicht-Migrierende** | 4/5 | Vom Projektträger bewusst akzeptiert. Aber: bei 40.000 Verlorenen ist dies ein Geschäftsschaden. **Tragender Mindestmigrationswert + Maßnahmenplan fehlen.** |
-| **R-04** | **Kein Recovery bei Geräteverlust** (bis 80.000 User) | 4/4 | Pro Einzelfall absolut. Empfehlung: mindestens **einen** Wiederherstellungsprozess für Gruppe A vorbereiten (analog F-12), sonst Support-Anfragen ohne Antwort. |
+| **R-04** | **Kein Recovery bei Geräteverlust ohne gültigen Einmalcode** (bis 80.000 User) | 4/4 | Selbstbedienbarer Recovery-Weg über PENR + Einmalcode (G-7) vorhanden, wenn Einmalcode bei erstmaliger Registrierung ausgegeben und sicher verwahrt wurde. Ohne PENR+Einmalcode endgültiger Zugangsverlust (FR-104). Ausgabepflicht bei Registrierung sicherstellen. |
 | **R-08** | **Zu geringe Migrationsquote** | 3/4 | 120.000 User, geringe Affinität, kein Kontrollgerät. Gegenmaßnahme: Mindestwert, Wochenquote, Eskalationsschwelle. |
 | **R-12** | **Supportbelastung durch unbenutzbare Passkeys** | 4/3 | Fällt erst **nach** dem 31.12. auf — dann ist Verifi weg und Gruppe A hat keinen Recovery. Einzige wirksame Maßnahme: Erreichbarkeitstest (C-3.5). Fachsupport ist niemandem zugewiesen (OQ-18). |
 | **R-11** | **Keine stabile Verknüpfung Account ↔ Portal-Stammdaten** | 3/4 | Ohne Kundennummer ist die E-Mail das einzige Merkmal — und sie ist änderbar. Schleichender Datenfehler bei 120.000 Usern. Entscheidung OQ-17 erforderlich (Empfehlung: E-Mail nur mit erneuter Verifi-Bestätigung oder gar nicht änderbar). |

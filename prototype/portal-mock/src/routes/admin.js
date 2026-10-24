@@ -13,6 +13,7 @@ import { cfg } from '../config.js';
 import { readPhase, writePhase } from '../phase.js';
 import { logEvent, refOf, listEvents } from '../db.js';
 import * as kc from '../keycloak.js';
+import { issueRecoveryCode } from '../recovery/store.js';
 
 export const adminRoutes = (app, db) => {
   const r = Router();
@@ -123,6 +124,44 @@ export const adminRoutes = (app, db) => {
       },
       failures,
     });
+  });
+
+  // API-09: Recovery-Code ausstellen (bei erstmaliger Passkey-Registrierung, BR-16)
+  r.post('/api/admin/recovery/issue', async (req, res) => {
+    try {
+      const body = req.body ?? {};
+      const verifiId = String(body.verifiId || body.verifi_id || '').trim();
+      const realm = String(body.realm || cfg.realm || 'passkey-prototyp');
+      const penr = String(body.penr || verifiId).trim(); // PENR - im Prototyp ableitbar
+
+      if (!verifiId) {
+        return res.status(400).json({ message: 'verifiId erforderlich.' });
+      }
+
+      // Sicherstellen, dass User existiert
+      const user = await kc.findUserByVerifiId(verifiId).catch(() => null);
+      if (!user) {
+        return res.status(404).json({ message: 'Nutzer nicht gefunden.' });
+      }
+
+      const issued = issueRecoveryCode({ realm, penr, verifiId });
+      if (!issued) {
+        return res.status(400).json({ message: 'Realm nicht für Recovery freigegeben.' });
+      }
+
+      logEvent(db, {
+        eventType: 'ops_action',
+        result: 'success',
+        reference: refOf(verifiId),
+        detail: `recovery_code_issued:${realm}`,
+      });
+
+      // Nur im Prototyp: Code zurückgeben (in Produktion sicher übergeben)
+      return res.json({ ok: true, realm: issued.realm, penr: issued.penr, code: issued.code });
+    } catch (err) {
+      console.warn('[admin/recovery/issue] Fehler:', err.message);
+      return res.status(500).json({ message: 'Ein technischer Fehler ist aufgetreten.' });
+    }
   });
 
   // Prototyp-Erweiterung (nicht in technical-spec §6): Ereignisprotokoll für

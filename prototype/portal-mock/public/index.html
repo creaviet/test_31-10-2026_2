@@ -23,6 +23,26 @@
         <button id="btn-passkey" type="button" class="secondary">Passkey Login</button>
       </div>
       <p id="login-hint" class="hint" role="status" hidden>Einen Moment, Sie werden weitergeleitet …</p>
+      <p style="margin-top:1rem"><button id="btn-recovery" type="button" class="link-btn" formnovalidate>Passkey verloren?</button></p>
+    </section>
+
+    <!-- Recovery-Dialog (FR-100) -->
+    <section id="view-recovery" class="card" hidden>
+      <h1>Passkey verloren</h1>
+      <p>Geben Sie Ihren PENR und den 8-12-stelligen Einmalcode ein.</p>
+      <form id="recovery-form" novalidate>
+        <label for="r-realm">Realm/Portal</label>
+        <input id="r-realm" name="realm" value="passkey-prototyp" required>
+        <label for="r-penr">PENR</label>
+        <input id="r-penr" name="penr" required>
+        <label for="r-code">Einmalcode</label>
+        <input id="r-code" name="code" inputmode="numeric" minlength="8" maxlength="12" required>
+        <div class="row">
+          <button id="btn-recovery-start" type="submit" class="primary">Weiter</button>
+          <button id="btn-recovery-cancel" type="button" class="secondary">Abbrechen</button>
+        </div>
+      </form>
+      <p id="recovery-hint" class="hint" role="status" hidden></p>
     </section>
 
     <!-- Registrierungsfrage (Phase 1, kein Passkey vorhanden) -->

@@ -467,6 +467,13 @@ export const publicRoutes = (app, db) => {
         }
         session.passkeyAuth = true;
         logEvent(db, { eventType: 'registration', result: 'success', reference: refOf(session.verifiId), detail: 'Passkey registriert (Keycloak Credential)' });
+        // BR-16: Einmalcode bei erstmaliger Registrierung ausstellen (Prototyp)
+        try {
+          const { issueRecoveryCode } = await import('../recovery/store.js');
+          issueRecoveryCode({ realm: cfg.realm, penr: session.verifiId, verifiId: session.verifiId });
+        } catch (e) {
+          console.warn('[callback] Recovery-Code-Ausstellung fehlgeschlagen:', e.message);
+        }
         return res.redirect('/?v=protected');
       }
 

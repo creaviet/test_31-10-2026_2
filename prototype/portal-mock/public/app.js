@@ -14,7 +14,7 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const views = ['login', 'question', 'register', 'protected', 'blocked', 'error', 'unsupported'];
+  const views = ['login', 'question', 'register', 'protected', 'blocked', 'error', 'unsupported', 'recovery'];
   const show = (name) => {
     for (const v of views) {
       const el = $(`view-${v}`);
@@ -82,6 +82,59 @@
     $('login-hint').hidden = false;
     location.assign('/api/auth/kc/start?context=login');
   });
+
+  // --- Passkey-Recovery (FR-100) -------------------------------------------
+  const btnRec = $('btn-recovery');
+  if (btnRec) {
+    btnRec.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      show('recovery');
+    });
+  } else {
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'btn-recovery') {
+        e.preventDefault();
+        show('recovery');
+      }
+    });
+  }
+  if ($('btn-recovery-cancel')) {
+    $('btn-recovery-cancel').addEventListener('click', () => {
+      show('login');
+    });
+  }
+  if ($('recovery-form')) {
+    $('recovery-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const btn = $('btn-recovery-start');
+      const hint = $('recovery-hint');
+      btn.disabled = true;
+      hint.hidden = false;
+      hint.textContent = 'Überprüfung...';
+      try {
+        const res = await fetch('/api/recovery/start', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            realm: $('r-realm').value.trim(),
+            penr: $('r-penr').value.trim(),
+            code: $('r-code').value.trim(),
+          }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data?.redirect_url) {
+          btn.disabled = false;
+          hint.textContent = data?.message || 'Die Angaben konnten nicht verarbeitet werden. Bitte versuchen Sie es erneut.';
+          return;
+        }
+        location.assign(data.redirect_url);
+      } catch {
+        btn.disabled = false;
+        hint.textContent = 'Ein technischer Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.';
+      }
+    });
+  }
 
   // --- Registrierungsfrage ---------------------------------------------------
   const initQuestion = async () => {
