@@ -135,7 +135,7 @@ async function passkeyCeremony(page, maxMs = 60_000) {
   const started = Date.now();
   for (;;) {
     const url = page.url();
-    if (url.includes('8080') && (url.includes('?v=protected') || url.includes('?v=blocked') || url.includes('?v=error'))) {
+    if (url.includes('8080') && (url.includes('?v=protected') || url.includes('?v=blocked') || url.includes('?v=error') || url.includes('?v=recovery-code'))) {
       return;
     }
     if (url.includes('8082')) {
@@ -227,6 +227,19 @@ test.describe.serial('Kundenportal-Prototyp (End-to-End)', () => {
     }
 
     await passkeyCeremony(page);
+
+    // BR-16/FR-102: Nach der Passkey-Registrierung MUSS der Einmalcode
+    // angezeigt werden (unabhängig davon, wie der Passkey erzeugt wurde).
+    await expect(page.locator('#view-recovery-code')).toBeVisible();
+    const recoveryCode = await page.locator('#rc-code').inputValue();
+    expect(recoveryCode).toMatch(/^\d{8,12}$/);
+    expect(await page.locator('#rc-penr').inputValue()).toBe('4f7a2c91b6d34e8fa50c1d2e3b4a5c6d');
+
+    // Erst nach Bestätigung ("gespeichert") geht es in den geschützten Bereich.
+    await Promise.all([
+      page.waitForURL((u) => u.searchParams.get('v') === 'protected'),
+      page.click('#btn-recovery-code-ack'),
+    ]);
     await expect(page.locator('#view-protected')).toBeVisible();
     await expect(page.locator('#protected-name')).toContainText('Erika');
   });

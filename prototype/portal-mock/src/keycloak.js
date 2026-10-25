@@ -98,6 +98,19 @@ export function hasWebAuthnCredential(credentials) {
   return Array.isArray(credentials) && credentials.some((c) => String(c.type || '').startsWith('webauthn'));
 }
 
+/**
+ * Entfernt ein Credential (z. B. einen alten/verlorenen Passkey) über die
+ * Admin-API. Beim Recovery wird der alte Passkey VOR der Neu-Registrierung
+ * widerrufen: Keycloak verweigert sonst die Registrierung mit demselben
+ * Credential-Namen ("Device already exists with the same name").
+ */
+export async function deleteCredential(userId, credentialId) {
+  await adminApi(
+    'DELETE',
+    `/admin/realms/${cfg.realm}/users/${userId}/credentials/${credentialId}`
+  );
+}
+
 export async function setRequiredAction(userId, action) {
   const user = await adminApi('GET', `/admin/realms/${cfg.realm}/users/${userId}`);
   user.requiredActions = [...new Set([...(user.requiredActions || []), action])];

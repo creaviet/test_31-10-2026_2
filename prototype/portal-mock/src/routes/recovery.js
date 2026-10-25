@@ -121,13 +121,40 @@ export const recoveryRoutes = (app, db) => {
         return json(res, 400, { message: 'Die Angaben konnten nicht verarbeitet werden. Bitte versuchen Sie es erneut.' });
       }
 
-      // Prüfen ob bereits Passkey vorhanden
+      // Recovery heißt: den alten Passkey ERSETZEN. Keycloak lehnt eine
+      // Neu-Registrierung mit demselben Credential-Namen ab
+      // ("Device already exists with the same name" /
+      // ModelDuplicateException). Deshalb werden die alten WebAuthn-Credentials
+      // VOR der Neu-Registrierung widerrufen — der Nutzer hat den alten Passkey
+      // ohnehin verloren, und nur so ist eine echte Ersetzung garantiert.
+      //
+      // Der frühere "already"-Sonderpfad war zusätzlich falsch: er hat die
+      // Pflicht-Aktion übersprungen, keine SSO-Session erzeugt und den Nutzer
+      // auf die Keycloak-Loginmaske geschickt (Username = Verifi-Kennung, kein
+      // Passwort gesetzt) → "Invalid username or password".
       const creds = await kc.listCredentials(user.id);
-      const already = kc.hasWebAuthnCredential(creds);
-      if (!already) {
-        await kc.setRequiredAction(user.id, 'webauthn-register-passwordless');
+      if (!Array.isArray(creds)) {
+        // Ohne Credential-Liste kann nicht garantiert ersetzt werden — laut
+        // protokollieren, statt später an einem Duplicate-Name-Fehler zu hängen.
+        console.warn('[recovery/register] Credential-Liste nicht abrufbar — alte Passkeys können ggf. nicht ersetzt werden.');
       }
-      const imp = already ? null : await kc.impersonate(user.id);
+      const oldCredentials = (Array.isArray(creds) ? creds : []).filter((c) =>
+        String(c.type || '').startsWith('webauthn')
+      );
+      for (const cred of oldCredentials) {
+        await kc.deleteCredential(user.id, cred.id);
+      }
+      if (oldCredentials.length > 0) {
+        logEvent(db, {
+          eventType: 'registration',
+          result: 'success',
+          reference: refOf(verifiId),
+          detail: `passkey_recovery_old_credentials_revoked:${oldCredentials.length}`,
+        });
+      }
+
+      await kc.setRequiredAction(user.id, 'webauthn-register-passwordless');
+      const imp = await kc.impersonate(user.id);
       if (imp?.setCookies?.length) {
         res.setHeader('set-cookie', imp.setCookies);
       }
@@ -150,7 +177,7 @@ export const recoveryRoutes = (app, db) => {
       return json(res, 201, {
         registration_id: registrationId,
         ceremony: {
-          mode: already ? 'keycloak-sso' : 'keycloak-required-action',
+          mode: 'keycloak-required-action',
           redirect_to: `${cfg.publicBaseUrl}/api/auth/kc/start?context=register`,
         },
       });
@@ -158,6 +185,36 @@ export const recoveryRoutes = (app, db) => {
       console.warn('[recovery/register] Fehler:', err.message);
       return json(res, 500, { message: 'Ein technischer Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' });
     }
+  });
+
+  // GET /api/recovery/pending-code - Einmalcode zur Anzeige nach der
+  // Passkey-Registrierung (BR-16). Der Code liegt ausschließlich in der
+  // Server-Session; er wird NICHT geloggt und nach Bestätigung gelöscht.
+  r.get('/api/recovery/pending-code', (req, res) => {
+    const session = getSession(parseCookies(req)[cookieName]);
+    if (!session) {
+      return json(res, 401, { message: 'Bitte melden Sie sich an.' });
+    }
+    const pending = session.recoveryCode;
+    if (!pending) {
+      return json(res, 404, { message: 'Kein Einmalcode zur Anzeige vorhanden.' });
+    }
+    return json(res, 200, {
+      code: pending.code,
+      penr: pending.penr,
+      realm: pending.realm,
+    });
+  });
+
+  // POST /api/recovery/pending-code/ack - Nutzer bestätigt, den Code gespeichert
+  // zu haben. Erst danach wird er aus der Session entfernt.
+  r.post('/api/recovery/pending-code/ack', (req, res) => {
+    const session = getSession(parseCookies(req)[cookieName]);
+    if (!session) {
+      return json(res, 401, { message: 'Bitte melden Sie sich an.' });
+    }
+    delete session.recoveryCode;
+    return json(res, 200, { ok: true });
   });
 
   app.use(r);

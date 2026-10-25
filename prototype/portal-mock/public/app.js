@@ -14,7 +14,7 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const views = ['login', 'question', 'register', 'protected', 'blocked', 'error', 'unsupported', 'recovery'];
+  const views = ['login', 'question', 'register', 'protected', 'blocked', 'error', 'unsupported', 'recovery', 'recovery-code'];
   const show = (name) => {
     for (const v of views) {
       const el = $(`view-${v}`);
@@ -132,6 +132,44 @@
       } catch {
         btn.disabled = false;
         hint.textContent = 'Ein technischer Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.';
+      }
+    });
+  }
+
+  // --- Einmalcode nach der Passkey-Registrierung (BR-16, FR-102) ------------
+  // Der Code wird vom Server nur einmal ausgestellt und in der Session gehalten.
+  // Diese Ansicht zeigt PENR + Einmalcode an, bis der Nutzer bestätigt, ihn
+  // gespeichert zu haben — erst dann geht es in den geschützten Bereich.
+  const showRecoveryCode = async () => {
+    try {
+      const res = await fetch('/api/recovery/pending-code');
+      if (res.status === 401) return show('login');
+      // 404 = kein ausstehender Code (z. B. bereits bestätigt) → normal weiter.
+      if (res.status === 404) return loadSession();
+      if (!res.ok) return showError('service');
+      const data = await res.json();
+      $('rc-penr').value = data.penr;
+      $('rc-code').value = data.code;
+      show('recovery-code');
+    } catch {
+      showError('service');
+    }
+  };
+
+  const btnCodeAck = $('btn-recovery-code-ack');
+  if (btnCodeAck) {
+    btnCodeAck.addEventListener('click', async () => {
+      const hint = $('recovery-code-hint');
+      btnCodeAck.disabled = true;
+      hint.hidden = false;
+      hint.textContent = 'Einen Moment …';
+      try {
+        const res = await fetch('/api/recovery/pending-code/ack', { method: 'POST' });
+        if (!res.ok) throw new Error('Bestätigung fehlgeschlagen');
+        location.replace('/?v=protected');
+      } catch {
+        btnCodeAck.disabled = false;
+        hint.textContent = 'Der Code konnte nicht bestätigt werden. Bitte versuchen Sie es erneut.';
       }
     });
   }
@@ -312,6 +350,7 @@
   const v = params.get('v');
   if (v === 'question') initQuestion();
   else if (v === 'protected') loadSession();
+  else if (v === 'recovery-code') showRecoveryCode();
   else if (v === 'blocked') show('blocked');
   else if (v === 'error') showError(params.get('m') || 'generic');
   else show('login');

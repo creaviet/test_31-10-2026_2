@@ -45,6 +45,27 @@
       <p id="recovery-hint" class="hint" role="status" hidden></p>
     </section>
 
+    <!-- Einmalcode nach der Passkey-Registrierung (BR-16, FR-102).
+         Der Code wird nur EINMAL ausgestellt und muss vor dem Weitergehen
+         gespeichert werden. Er wird serverseitig aus der Session gelesen. -->
+    <section id="view-recovery-code" class="card" hidden>
+      <h1>Einmalcode für die Passkey-Wiederherstellung</h1>
+      <p>
+        Ihr Passkey wurde eingerichtet. Bitte bewahren Sie den folgenden
+        Einmalcode zusammen mit Ihrer PENR sicher auf. Sie benötigen beides,
+        falls Sie Ihren Passkey einmal verlieren.
+      </p>
+      <label for="rc-penr">PENR</label>
+      <input id="rc-penr" readonly>
+      <label for="rc-code">Einmalcode</label>
+      <input id="rc-code" readonly>
+      <p class="hint">Der Einmalcode wird nur jetzt angezeigt und kann danach nicht erneut abgerufen werden.</p>
+      <p id="recovery-code-hint" class="hint" role="status" hidden></p>
+      <div class="row">
+        <button id="btn-recovery-code-ack" type="button" class="primary">Ich habe den Code gespeichert</button>
+      </div>
+    </section>
+
     <!-- Registrierungsfrage (Phase 1, kein Passkey vorhanden) -->
     <section id="view-question" class="card" hidden>
       <h1>Zukünftige Anmeldung</h1>

@@ -467,14 +467,58 @@ export const publicRoutes = (app, db) => {
         }
         session.passkeyAuth = true;
         logEvent(db, { eventType: 'registration', result: 'success', reference: refOf(session.verifiId), detail: 'Passkey registriert (Keycloak Credential)' });
-        // BR-16: Einmalcode bei erstmaliger Registrierung ausstellen (Prototyp)
+
+        // BR-16: Einmalcode bei der Passkey-Registrierung ausstellen UND dem
+        // Nutzer anzeigen (FR-102). Der Code wird nur einmal ausgegeben — wir
+        // legen ihn deshalb in der Session ab und leiten auf die Anzeige-Seite
+        // (`?v=recovery-code`) um. Erst nach Bestätigung ("gespeichert") geht es
+        // in den geschützten Bereich.
+        //
+        // Die PENR ist realmgebunden (FR-101) und im Prototyp = Verifi-Kennung.
+        // Sie wird beim Recovery-Formular ebenfalls benötigt und deshalb
+        // zusammen mit dem Code angezeigt.
+        const verifiId = session.verifiId || payload.preferred_username || null;
+        if (!verifiId) {
+          // Ohne Kennung kann kein PENR-gebundener Code ausgestellt werden.
+          // Registrierung nicht scheitern lassen, aber den Fehler protokollieren.
+          logEvent(db, {
+            eventType: 'registration',
+            result: 'failure',
+            reference: null,
+            detail: 'recovery_code_not_issued:missing_verifi_id',
+          });
+          return res.redirect('/?v=protected');
+        }
+        // Sicherstellen, dass die (ggf. aus dem Token übernommene) Kennung auch
+        // in der Session steht — Basis für Anzeigename und Recovery-Bindung.
+        session.verifiId = session.verifiId || verifiId;
         try {
           const { issueRecoveryCode } = await import('../recovery/store.js');
-          issueRecoveryCode({ realm: cfg.realm, penr: session.verifiId, verifiId: session.verifiId });
+          const issued = issueRecoveryCode({ realm: cfg.realm, penr: verifiId, verifiId });
+          if (!issued) throw new Error(`Realm ${cfg.realm} nicht für Recovery freigegeben`);
+          session.recoveryCode = {
+            code: issued.code,
+            penr: issued.penr,
+            realm: issued.realm,
+            issuedAt: new Date().toISOString(),
+          };
+          logEvent(db, {
+            eventType: 'registration',
+            result: 'success',
+            reference: refOf(verifiId),
+            detail: `recovery_code_issued:${issued.realm}`,
+          });
+          return res.redirect('/?v=recovery-code');
         } catch (e) {
           console.warn('[callback] Recovery-Code-Ausstellung fehlgeschlagen:', e.message);
+          logEvent(db, {
+            eventType: 'registration',
+            result: 'failure',
+            reference: refOf(verifiId),
+            detail: 'recovery_code_not_issued',
+          });
+          return res.redirect('/?v=protected');
         }
-        return res.redirect('/?v=protected');
       }
 
       // login / verify
